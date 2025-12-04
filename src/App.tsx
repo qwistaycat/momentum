@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Heart,
   ArrowLeft,
@@ -21,6 +21,14 @@ type Idea = {
   notes?: string;
   images?: string[];
   image?: string;
+};
+
+type NoteLayout = {
+  x: number;
+  y: number;
+  color: string;
+  rotate: number;
+  z: number;
 };
 
 type PastWork = {
@@ -173,6 +181,41 @@ const initialIdeas: Idea[] = [
   },
 ];
 
+const stickyNoteColors = [
+  "#fff8c5",
+  "#ffe4ec",
+  "#e1f5ff",
+  "#e9ffdb",
+  "#fff0d9",
+  "#f1e8ff",
+];
+
+const createNoteLayout = (index: number): NoteLayout => {
+  const column = index % 3;
+  const row = Math.floor(index / 3);
+  const baseX = column * 260 + 32;
+  const baseY = row * 230 + 28;
+
+  return {
+    x: baseX + (Math.random() * 30 - 15),
+    y: baseY + (Math.random() * 30 - 12),
+    color: stickyNoteColors[index % stickyNoteColors.length],
+    rotate: Math.random() * 4 - 2,
+    z: index + 1,
+  };
+};
+
+const buildInitialLayouts = () => {
+  const layout: Record<number, NoteLayout> = {};
+  initialIdeas.forEach((idea, index) => {
+    layout[idea.id] = createNoteLayout(index);
+  });
+  return layout;
+};
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
 // Hashtag suggestions
 const hashtagSuggestions = [
   // Medium
@@ -314,6 +357,12 @@ function MomentumApp() {
 
   // Idea Bank state
   const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
+  const [noteLayout, setNoteLayout] = useState<
+    Record<number, NoteLayout>
+  >(buildInitialLayouts);
+  const [zCounter, setZCounter] = useState(
+    initialIdeas.length + 5,
+  );
   const [showNewIdeaModal, setShowNewIdeaModal] =
     useState(false);
   const [newIdeaTitle, setNewIdeaTitle] = useState("");
@@ -336,6 +385,10 @@ function MomentumApp() {
 
   // Fullscreen image modal
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const draggingIdRef = useRef<number | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const imageClickTimeout = useRef<number | null>(null);
 
   // Convert time string to seconds
   const timeToSeconds = (timeStr: string | null): number => {
@@ -370,6 +423,133 @@ function MomentumApp() {
       .toString()
       .padStart(2, "0")}`;
   };
+
+  const updateLayoutPosition = (clientX: number, clientY: number) => {
+    const currentId = draggingIdRef.current;
+    if (currentId === null) return;
+
+    setNoteLayout((prev) => {
+      const layout = prev[currentId];
+      if (!layout) return prev;
+      const boardRect =
+        boardRef.current?.getBoundingClientRect();
+      const noteWidth = 260;
+      const noteHeight = 240;
+      const boardWidth = boardRect?.width || 900;
+      const boardHeight = boardRect?.height || 800;
+      const offsetX = boardRect?.left || 0;
+      const offsetY = boardRect?.top || 0;
+
+      const nextX = clamp(
+        clientX - offsetX - dragOffsetRef.current.x,
+        12,
+        Math.max(12, boardWidth - noteWidth),
+      );
+      const nextY = clamp(
+        clientY - offsetY - dragOffsetRef.current.y,
+        12,
+        Math.max(12, boardHeight - noteHeight),
+      );
+
+      return {
+        ...prev,
+        [currentId]: { ...layout, x: nextX, y: nextY },
+      };
+    });
+  };
+
+  const startDrag = (
+    e:
+      | React.MouseEvent<HTMLDivElement>
+      | React.TouchEvent<HTMLDivElement>,
+    ideaId: number,
+  ) => {
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    e.stopPropagation();
+    const layout = noteLayout[ideaId];
+    if (!layout) return;
+
+    const point =
+      "touches" in e ? e.touches[0] : e;
+    if (!point) return;
+
+    const boardRect =
+      boardRef.current?.getBoundingClientRect();
+    const offsetX =
+      point.clientX - (boardRect?.left || 0) - layout.x;
+    const offsetY =
+      point.clientY - (boardRect?.top || 0) - layout.y;
+
+    draggingIdRef.current = ideaId;
+    dragOffsetRef.current = { x: offsetX, y: offsetY };
+    setZCounter((prevZ) => {
+      const nextZ = prevZ + 1;
+      setNoteLayout((prev) => ({
+        ...prev,
+        [ideaId]: { ...prev[ideaId], z: nextZ },
+      }));
+      return nextZ;
+    });
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (draggingIdRef.current === null) return;
+      e.preventDefault();
+      updateLayoutPosition(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (draggingIdRef.current === null) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      e.preventDefault();
+      updateLayoutPosition(touch.clientX, touch.clientY);
+    };
+
+    const endDrag = () => {
+      draggingIdRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("touchmove", handleTouchMove, {
+      passive: false,
+    });
+    window.addEventListener("touchend", endDrag);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", endDrag);
+      window.removeEventListener(
+        "touchmove",
+        handleTouchMove,
+      );
+      window.removeEventListener("touchend", endDrag);
+    };
+  }, []);
+
+  useEffect(() => {
+    setNoteLayout((prev) => {
+      let changed = false;
+      let added = 0;
+      const next = { ...prev };
+      const baseIndex = Object.keys(next).length;
+
+      ideas.forEach((idea) => {
+        if (!next[idea.id]) {
+          next[idea.id] = createNoteLayout(
+            baseIndex + added,
+          );
+          added += 1;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [ideas]);
 
   // Start timer (countdown)
   const startTimer = () => {
@@ -463,6 +643,29 @@ function MomentumApp() {
         (tag) => !newIdeaTags.includes(tag),
       );
 
+  const handleIdeaImageClick = (
+    e: React.MouseEvent<HTMLImageElement>,
+    cover: string,
+  ) => {
+    if (imageClickTimeout.current) {
+      window.clearTimeout(imageClickTimeout.current);
+    }
+    if (e.detail > 1) return;
+
+    imageClickTimeout.current = window.setTimeout(() => {
+      setFullscreenImage(cover);
+      imageClickTimeout.current = null;
+    }, 180);
+  };
+
+  const handleIdeaImageDoubleClick = (idea: Idea) => {
+    if (imageClickTimeout.current) {
+      window.clearTimeout(imageClickTimeout.current);
+      imageClickTimeout.current = null;
+    }
+    openEditIdea(idea);
+  };
+
   const saveNewIdea = () => {
     if (!newIdeaTitle.trim()) return;
 
@@ -479,6 +682,12 @@ function MomentumApp() {
     };
 
     setIdeas([newIdea, ...ideas]);
+    setNoteLayout((prev) => ({
+      ...prev,
+      [newIdea.id]: createNoteLayout(
+        Object.keys(prev).length,
+      ),
+    }));
 
     // Reset form
     setNewIdeaTitle("");
@@ -531,6 +740,10 @@ function MomentumApp() {
     const confirmed = window.confirm("Delete this idea?");
     if (!confirmed) return;
     setIdeas(ideas.filter((idea) => idea.id !== id));
+    setNoteLayout((prev) => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
   };
 
   // Past Work functions
@@ -620,6 +833,12 @@ function MomentumApp() {
     };
 
     setIdeas([newIdea, ...ideas]);
+    setNoteLayout((prev) => ({
+      ...prev,
+      [newIdea.id]: createNoteLayout(
+        Object.keys(prev).length,
+      ),
+    }));
     setCurrentScreen("ideaBank");
   };
 
@@ -1437,74 +1656,129 @@ function MomentumApp() {
             <p>No ideas yet. Click "New Idea" to add one!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-6">
-            {ideas.map((idea) => {
-              const cover = idea.image || (idea.images && idea.images[0]);
-              return (
-                <div
-                  key={idea.id}
-                  className="duo-panel overflow-hidden shadow-md hover:shadow-xl transition-all relative group"
-                >
-                  {/* Edit button */}
-                  <button
-                    onClick={() => openEditIdea(idea)}
-                    className="absolute top-4 right-10 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#e6fbce] z-10 border border-[#d9f1ba]"
+          <div className="relative rounded-[32px] border border-[#d7bfa0] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_30px_60px_rgba(0,0,0,0.08)] bg-[#f3e0bc] overflow-hidden">
+            <div
+              className="absolute inset-0 opacity-50 pointer-events-none"
+              style={{
+                backgroundImage:
+                  "radial-gradient(#d5bd93 1px, transparent 1px)",
+                backgroundSize: "26px 26px",
+              }}
+            />
+            <div
+              ref={boardRef}
+              className="relative min-h-[70vh] p-6 sm:p-10"
+            >
+              {ideas.map((idea, index) => {
+                const cover =
+                  idea.image || (idea.images && idea.images[0]);
+                const layout = noteLayout[idea.id] || createNoteLayout(index);
+
+                return (
+                  <div
+                    key={idea.id}
+                    className="group absolute w-[230px] sm:w-[260px] cursor-grab active:cursor-grabbing transition-all duration-150"
+                    style={{
+                      transform: `translate(${layout.x}px, ${layout.y}px) rotate(${layout.rotate}deg)`,
+                      zIndex: layout.z,
+                    }}
+                    onMouseDown={(e) => startDrag(e, idea.id)}
+                    onTouchStart={(e) => startDrag(e, idea.id)}
                   >
-                    <Edit2 size={16} className="text-[#2f5b19]" />
-                  </button>
-
-                  {/* Delete button */}
-                  <button
-                    onClick={() => deleteIdea(idea.id)}
-                    className="absolute top-4 right-2 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10 border border-[#d9f1ba]"
-                  >
-                    <X size={16} className="text-red-500" />
-                  </button>
-
-                  <div className="p-4">
-                    {/* Cover Image */}
-                    {cover && (
-                      <ImageWithFallback
-                        src={cover}
-                        alt={idea.title}
-                        onClick={() => setFullscreenImage(cover)}
-                        className="w-full h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-all mb-3"
-                      />
-                    )}
-
-                    <h3 className="text-[#0f3012] mb-2 font-bold">
-                      {idea.title}
-                    </h3>
-
-                    {idea.notes && (
-                      <p className="text-[#2f5b19] text-sm mb-3 line-clamp-2">
-                        {idea.notes}
-                      </p>
-                    )}
-
-                    {/* Tags */}
-                    {idea.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {idea.tags.slice(0, 3).map((tag) => (
-                          <span key={tag} className="duo-chip text-xs">
-                            #{tag}
-                          </span>
-                        ))}
-                        {idea.tags.length > 3 && (
-                          <span className="text-[#6e7f5b] text-xs">
-                            +{idea.tags.length - 3} more
-                          </span>
-                        )}
+                    <div
+                      className="relative rounded-[18px] shadow-[0_14px_35px_rgba(0,0,0,0.18)] border border-[#e0c9a8] backdrop-blur-sm"
+                      style={{ backgroundColor: layout.color }}
+                    >
+                      <div className="absolute left-1/2 -top-7 -translate-x-1/2 flex flex-col items-center pointer-events-none">
+                        <div className="w-[6px] h-7 bg-[#c2410c] rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.35)]" />
+                        <div className="w-5 h-5 rounded-full bg-[#ff9b73] border border-[#b43418] shadow-[0_4px_10px_rgba(0,0,0,0.38)] -mt-1" />
                       </div>
-                    )}
 
-                    <p className="text-[#3c6d23] font-semibold text-sm">
-                      {idea.date}
-                    </p>
+                      {/* Edit button */}
+                      <button
+                        onClick={() => openEditIdea(idea)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="absolute top-3 right-10 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[#e6fbce] transition-all z-10 border border-[#d9f1ba]"
+                      >
+                        <Edit2 size={16} className="text-[#2f5b19]" />
+                      </button>
+
+                      {/* Delete button */}
+                      <button
+                        onClick={() => deleteIdea(idea.id)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="absolute top-3 right-3 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 transition-all z-10 border border-[#d9f1ba]"
+                      >
+                        <X size={16} className="text-red-500" />
+                      </button>
+
+                      <div className="p-4 pt-8 space-y-3 group">
+                        {/* Cover Image */}
+                        {cover && (
+                          <ImageWithFallback
+                            src={cover}
+                            alt={idea.title}
+                            onClick={(e) =>
+                              handleIdeaImageClick(e, cover)
+                            }
+                            onDoubleClick={() =>
+                              handleIdeaImageDoubleClick(idea)
+                            }
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="w-full h-36 object-cover rounded-xl cursor-pointer hover:shadow-lg transition-all"
+                          />
+                        )}
+
+                        <h3
+                          className="text-[#0f3012] font-extrabold"
+                          onDoubleClick={() => openEditIdea(idea)}
+                        >
+                          {idea.title}
+                        </h3>
+
+                        {idea.notes && (
+                          <p
+                            className="text-[#2f5b19] text-sm line-clamp-3"
+                            onDoubleClick={() => openEditIdea(idea)}
+                          >
+                            {idea.notes}
+                          </p>
+                        )}
+
+                        {/* Tags */}
+                        {idea.tags.length > 0 && (
+                          <div
+                            className="flex flex-wrap gap-1"
+                            onDoubleClick={() => openEditIdea(idea)}
+                          >
+                            {idea.tags.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag}
+                                className="duo-chip text-xs bg-white/70 border-[#d9f1ba]"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                            {idea.tags.length > 3 && (
+                              <span className="text-[#6e7f5b] text-xs">
+                                +{idea.tags.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="text-[#3c6d23] font-semibold text-sm">
+                          {idea.date}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
