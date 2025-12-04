@@ -572,12 +572,15 @@ function MomentumApp() {
   const saveNewWork = () => {
     if (!newWorkTitle.trim()) return;
 
+    const coverImage = newWorkImages[0];
+
     const newWork: PastWork = {
       id: pastWork.length + 1,
       title: newWorkTitle,
       date: "Just now",
       time: newWorkTime,
       images: newWorkImages,
+      image: coverImage,
     };
 
     setPastWork([newWork, ...pastWork]);
@@ -600,6 +603,8 @@ function MomentumApp() {
   const updateWork = () => {
     if (!newWorkTitle.trim()) return;
 
+    const coverImage = newWorkImages[0];
+
     const updatedWork = pastWork.map((work) =>
       work.id === editingWorkId
         ? {
@@ -607,6 +612,7 @@ function MomentumApp() {
             title: newWorkTitle,
             time: newWorkTime,
             images: newWorkImages,
+            image: coverImage,
           }
         : work,
     );
