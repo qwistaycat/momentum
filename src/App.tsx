@@ -1448,134 +1448,106 @@ function MomentumApp() {
   const IdeaBankScreen = () => (
     <div className="min-h-screen duo-hero p-8 relative">
       <div className="absolute inset-0 pointer-events-none opacity-25 duo-dots" />
-      <div className="max-w-5xl mx-auto space-y-6 relative z-10">
-        <div className="flex justify-between items-center">
+      <div className="max-w-4xl mx-auto relative z-10">
+        <div className="flex justify-between items-center mb-6">
           <button
             onClick={() => setCurrentScreen("checkIn")}
             className="text-[#2f5b19] hover:text-[#0f3012] flex items-center gap-2 font-semibold"
           >
             <ArrowLeft size={20} /> Back
           </button>
-          <div className="flex items-center gap-3">
-            <span className="duo-chip text-xs">💡 Drag and drop your ideas</span>
-            <button
-              onClick={() => setShowNewIdeaModal(true)}
-              className="duo-pill duo-cta px-4 py-2 flex items-center gap-2 text-base"
-            >
-              <Plus size={20} /> New Idea
-            </button>
-          </div>
+          <button
+            onClick={() => setShowNewIdeaModal(true)}
+            className="duo-pill duo-cta px-4 py-2 flex items-center gap-2 text-base"
+          >
+            <Plus size={20} /> New Idea
+          </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-6">
           <h2 className="text-[#0f3012] text-2xl font-extrabold">
             Your Idea Bank
           </h2>
-          <span className="duo-chip text-xs">📌 Drop sticky notes on the board</span>
+          <span className="duo-chip text-xs">
+            💡 {ideas.length} ideas saved
+          </span>
         </div>
 
-        <div
-          ref={boardRef}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            if (!boardRef.current || draggingIdea === null) return;
-            const rect = boardRef.current.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const pctX = Math.min(90, Math.max(10, (x / rect.width) * 100));
-            const pctY = Math.min(90, Math.max(10, (y / rect.height) * 100));
-            setIdeaPositions((prev) => ({
-              ...prev,
-              [draggingIdea]: { x: pctX, y: pctY },
-            }));
-            setDraggingIdea(null);
-          }}
-          className="relative rounded-[32px] border-2 border-[#d9c4a6] bg-[linear-gradient(135deg,#f4e3c3,#f0d7a8)] shadow-xl overflow-hidden h-[70vh]"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(255,255,255,0.25),transparent_35%),radial-gradient(circle_at_80%_70%,rgba(255,255,255,0.2),transparent_30%)] pointer-events-none" />
-          {ideas.map((idea, idx) => {
-            const pos =
-              ideaPositions[idea.id] || {
-                x: 15 + (idx % 3) * 28,
-                y: 12 + Math.floor(idx / 3) * 22,
-              };
-            const cover = idea.image || (idea.images && idea.images[0]);
-            return (
-              <div
-                key={idea.id}
-                draggable
-                onDragStart={(e) => {
-                  setDraggingIdea(idea.id);
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setDragOffset({
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top,
-                  });
-                  e.dataTransfer.effectAllowed = "move";
-                }}
-                onDragEnd={() => setDraggingIdea(null)}
-                className={`absolute w-60 bg-[#fff9b1] shadow-[0_12px_24px_rgba(0,0,0,0.08)] rounded-2xl p-4 border border-[#e7d27a] cursor-grab active:cursor-grabbing transition-transform duration-200 ${
-                  draggingIdea === idea.id ? "scale-105 rotate-[-1deg]" : "hover:-translate-y-1"
-                }`}
-                style={{
-                  left: `${pos.x}%`,
-                  top: `${pos.y}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                {cover && (
-                  <div className="mb-2">
-                    <ImageWithFallback
-                      src={cover}
-                      alt={`${idea.title} cover`}
-                      className="w-full h-16 object-cover rounded-lg"
-                    />
-                  </div>
-                )}
-                <div className="flex justify-between items-start gap-2 mb-2">
-                  <h3 className="text-[#0f3012] font-extrabold text-lg leading-tight">
-                    {idea.title}
-                  </h3>
+        {ideas.length === 0 ? (
+          <div className="text-center text-[#6e7f5b] py-12">
+            <p>No ideas yet. Click "New Idea" to add one!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-6">
+            {ideas.map((idea) => {
+              const cover = idea.image || (idea.images && idea.images[0]);
+              return (
+                <div
+                  key={idea.id}
+                  className="duo-panel overflow-hidden shadow-md hover:shadow-xl transition-all relative group"
+                >
+                  {/* Edit button */}
+                  <button
+                    onClick={() => openEditIdea(idea)}
+                    className="absolute top-4 right-10 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#e6fbce] z-10 border border-[#d9f1ba]"
+                  >
+                    <Edit2 size={16} className="text-[#2f5b19]" />
+                  </button>
+
+                  {/* Delete button */}
                   <button
                     onClick={() => deleteIdea(idea.id)}
-                    className="text-red-500 hover:text-red-700"
-                    aria-label="Delete Idea"
+                    className="absolute top-4 right-2 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10 border border-[#d9f1ba]"
                   >
-                    <X size={16} />
+                    <X size={16} className="text-red-500" />
                   </button>
-                </div>
-                {idea.notes && (
-                  <p className="text-[#2f5b19] text-sm mb-2 line-clamp-3">
-                    {idea.notes}
-                  </p>
-                )}
-                <p className="text-[#3c6d23] text-xs font-semibold mb-2">
-                  Added {idea.date}
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  {idea.tags.map((tag) => (
-                    <span key={tag} className="duo-chip text-xs">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-                {idea.images && idea.images.length > 0 && (
-                  <div className="mt-3 grid grid-cols-3 gap-1">
-                    {idea.images.slice(0, 3).map((img, imageIdx) => (
+
+                  <div className="p-4">
+                    {/* Cover Image */}
+                    {cover && (
                       <ImageWithFallback
-                        key={imageIdx}
-                        src={img}
-                        alt={`${idea.title} ref ${imageIdx + 1}`}
-                        className="w-full h-12 object-cover rounded-md"
+                        src={cover}
+                        alt={idea.title}
+                        onClick={() => setFullscreenImage(cover)}
+                        className="w-full h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-all mb-3"
                       />
-                    ))}
+                    )}
+
+                    <h3 className="text-[#0f3012] mb-2 font-bold">
+                      {idea.title}
+                    </h3>
+
+                    {idea.notes && (
+                      <p className="text-[#2f5b19] text-sm mb-3 line-clamp-2">
+                        {idea.notes}
+                      </p>
+                    )}
+
+                    {/* Tags */}
+                    {idea.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {idea.tags.slice(0, 3).map((tag) => (
+                          <span key={tag} className="duo-chip text-xs">
+                            #{tag}
+                          </span>
+                        ))}
+                        {idea.tags.length > 3 && (
+                          <span className="text-[#6e7f5b] text-xs">
+                            +{idea.tags.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="text-[#3c6d23] font-semibold text-sm">
+                      {idea.date}
+                    </p>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
