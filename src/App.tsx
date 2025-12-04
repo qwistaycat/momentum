@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   Heart,
   ArrowLeft,
@@ -336,9 +336,6 @@ function MomentumApp() {
 
   // Fullscreen image modal
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const [ideaPositions, setIdeaPositions] = useState<Record<number, { x: number; y: number }>>({});
-  const [draggingIdea, setDraggingIdea] = useState<number | null>(null);
-  const boardRef = useRef<HTMLDivElement | null>(null);
 
   // Convert time string to seconds
   const timeToSeconds = (timeStr: string | null): number => {
@@ -434,15 +431,6 @@ function MomentumApp() {
   };
 
   // Idea Bank functions
-  const computePosition = (index: number) => {
-    const col = index % 3;
-    const row = Math.floor(index / 3);
-    return {
-      x: 12 + col * 28,
-      y: 10 + row * 22,
-    };
-  };
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files);
     const imageUrls = files.map((file) => URL.createObjectURL(file));
@@ -491,10 +479,6 @@ function MomentumApp() {
     };
 
     setIdeas([newIdea, ...ideas]);
-    setIdeaPositions((prev) => ({
-      ...prev,
-      [newIdea.id]: computePosition(ideas.length),
-    }));
 
     // Reset form
     setNewIdeaTitle("");
@@ -547,11 +531,6 @@ function MomentumApp() {
     const confirmed = window.confirm("Delete this idea?");
     if (!confirmed) return;
     setIdeas(ideas.filter((idea) => idea.id !== id));
-    setIdeaPositions((prev) => {
-      const updated = { ...prev };
-      delete updated[id];
-      return updated;
-    });
   };
 
   // Past Work functions
@@ -641,28 +620,8 @@ function MomentumApp() {
     };
 
     setIdeas([newIdea, ...ideas]);
-    setIdeaPositions((prev) => ({
-      ...prev,
-      [newIdea.id]: computePosition(ideas.length),
-    }));
     setCurrentScreen("ideaBank");
   };
-
-  useEffect(() => {
-    // Initialize default positions if none exist (simple spread layout)
-    if (ideas.length && Object.keys(ideaPositions).length === 0) {
-      const defaults = ideas.reduce((acc, idea, idx) => {
-        const col = idx % 3;
-        const row = Math.floor(idx / 3);
-        acc[idea.id] = {
-          x: 12 + col * 28,
-          y: 10 + row * 22,
-        };
-        return acc;
-      }, {});
-      setIdeaPositions(defaults);
-    }
-  }, [ideas, ideaPositions]);
 
   // New Work Modal
   const NewWorkModal = () => (
