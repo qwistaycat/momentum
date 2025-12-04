@@ -626,8 +626,8 @@ function MomentumApp() {
   // New Work Modal
   const NewWorkModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="duo-panel shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white/90 border-b border-[#d9f1ba] px-8 py-6 rounded-t-3xl flex justify-between items-center backdrop-blur">
+      <div className="duo-panel shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex-shrink-0 bg-white border-b border-[#d9f1ba] px-8 py-6 rounded-t-3xl flex justify-between items-center">
           <h2 className="text-[#0f3012] font-extrabold">
             {editingWorkId ? "Edit Work" : "New Work"}
           </h2>
@@ -645,7 +645,7 @@ function MomentumApp() {
           </button>
         </div>
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-8 py-6 space-y-6 overflow-y-auto flex-1">
           {/* Title */}
           <div>
             <label className="text-[#1f4613] mb-2 block font-semibold">
@@ -721,7 +721,7 @@ function MomentumApp() {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white/90 border-t border-[#d9f1ba] px-8 py-6 rounded-b-3xl flex gap-4 backdrop-blur">
+        <div className="flex-shrink-0 bg-white border-t border-[#d9f1ba] px-8 py-6 rounded-b-3xl flex gap-4">
           <button
             onClick={() => setShowNewWorkModal(false)}
             className="flex-1 py-3 duo-pill duo-secondary hover:-translate-y-0.5 transition-transform"
@@ -747,8 +747,8 @@ function MomentumApp() {
   // New Idea Modal
   const NewIdeaModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="duo-panel shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white/90 border-b border-[#d9f1ba] px-8 py-6 rounded-t-3xl flex justify-between items-center backdrop-blur">
+      <div className="duo-panel shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex-shrink-0 bg-white border-b border-[#d9f1ba] px-8 py-6 rounded-t-3xl flex justify-between items-center">
           <h2 className="text-[#0f3012] font-extrabold">
             {editingIdeaId ? "Edit Idea" : "New Idea"}
           </h2>
@@ -767,7 +767,7 @@ function MomentumApp() {
           </button>
         </div>
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-8 py-6 space-y-6 overflow-y-auto flex-1">
           {/* Title */}
           <div>
             <label className="text-[#1f4613] mb-2 block font-semibold">
@@ -916,7 +916,7 @@ function MomentumApp() {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white/90 border-t border-[#d9f1ba] px-8 py-6 rounded-b-3xl flex gap-4 backdrop-blur">
+        <div className="flex-shrink-0 bg-white border-t border-[#d9f1ba] px-8 py-6 rounded-b-3xl flex gap-4">
           <button
             onClick={() => setShowNewIdeaModal(false)}
             className="flex-1 py-3 duo-pill duo-secondary hover:-translate-y-0.5 transition-transform"
