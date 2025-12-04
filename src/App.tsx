@@ -324,6 +324,23 @@ function MomentumApp() {
   const [showTagSuggestions, setShowTagSuggestions] =
     useState(false);
   const [editingIdeaId, setEditingIdeaId] = useState<number | null>(null);
+  
+  // Sticky note positions for bulletin board
+  const [notePositions, setNotePositions] = useState<{[key: number]: {x: number, y: number}}>({});
+  const [draggingNote, setDraggingNote] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState<{x: number, y: number}>({x: 0, y: 0});
+  
+  // Sticky note colors (classic Windows Sticky Notes style)
+  const stickyColors = [
+    { bg: '#fff740', shadow: '#e6de00', text: '#5c4b00' }, // Yellow
+    { bg: '#ff7eb9', shadow: '#e64d8c', text: '#6b1d3f' }, // Pink
+    { bg: '#7afcff', shadow: '#00d4d8', text: '#004d4f' }, // Cyan
+    { bg: '#feff9c', shadow: '#e6e600', text: '#5c5c00' }, // Light Yellow
+    { bg: '#ff65a3', shadow: '#e6327a', text: '#6b0f38' }, // Hot Pink
+    { bg: '#7affaf', shadow: '#00e64d', text: '#004d1a' }, // Mint
+    { bg: '#ffb347', shadow: '#e68a00', text: '#5c3700' }, // Orange
+    { bg: '#c9b1ff', shadow: '#9966ff', text: '#2d1a5c' }, // Lavender
+  ];
 
   // Past Work state
   const [pastWork, setPastWork] = useState<PastWork[]>(mockPastWork);
@@ -531,6 +548,52 @@ function MomentumApp() {
     const confirmed = window.confirm("Delete this idea?");
     if (!confirmed) return;
     setIdeas(ideas.filter((idea) => idea.id !== id));
+  };
+
+  // Get initial position for a note (spread out on the board with deterministic offsets)
+  const getInitialPosition = (index: number, ideaId: number) => {
+    const cols = 3;
+    const row = Math.floor(index / cols);
+    const col = index % cols;
+    // Use ideaId to create deterministic but varied offsets
+    const offsetX = ((ideaId * 17) % 41) - 20; // -20 to +20
+    const offsetY = ((ideaId * 13) % 31) - 15; // -15 to +15
+    const baseX = 50 + col * 280 + offsetX;
+    const baseY = 120 + row * 320 + offsetY;
+    return { x: baseX, y: baseY };
+  };
+
+  // Handle drag start
+  const handleDragStart = (e: React.MouseEvent, ideaId: number) => {
+    const stickyNote = (e.target as HTMLElement).closest('.sticky-note');
+    const rect = stickyNote?.getBoundingClientRect();
+    if (rect) {
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+    setDraggingNote(ideaId);
+  };
+
+  // Handle drag move
+  const handleDragMove = (e: React.MouseEvent) => {
+    if (draggingNote === null) return;
+    const boardRect = (e.target as HTMLElement).closest('.bulletin-board')?.getBoundingClientRect();
+    if (boardRect) {
+      setNotePositions(prev => ({
+        ...prev,
+        [draggingNote]: {
+          x: e.clientX - boardRect.left - dragOffset.x,
+          y: e.clientY - boardRect.top - dragOffset.y
+        }
+      }));
+    }
+  };
+
+  // Handle drag end
+  const handleDragEnd = () => {
+    setDraggingNote(null);
   };
 
   // Past Work functions
@@ -1403,113 +1466,283 @@ function MomentumApp() {
     );
   };
 
-  // Screen 4: Idea Bank
-  const IdeaBankScreen = () => (
-    <div className="min-h-screen duo-hero p-8 relative">
-      <div className="absolute inset-0 pointer-events-none opacity-25 duo-dots" />
-      <div className="max-w-4xl mx-auto relative z-10">
-        <div className="flex justify-between items-center mb-6">
+  // Screen 4: Idea Bank - Bulletin Board Style
+  const IdeaBankScreen = () => {
+    const boardRef = React.useRef<HTMLDivElement>(null);
+    
+    return (
+      <div 
+        className="min-h-screen relative overflow-hidden"
+        style={{
+          background: `
+            linear-gradient(135deg, #8B4513 0%, #A0522D 25%, #8B4513 50%, #6B3E0A 75%, #8B4513 100%),
+            url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23654321' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")
+          `,
+          backgroundBlendMode: 'overlay',
+        }}
+      >
+        {/* Cork board texture overlay */}
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `
+              radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.1) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 70%, rgba(0,0,0,0.15) 0%, transparent 50%)
+            `,
+          }}
+        />
+        
+        {/* Board frame */}
+        <div 
+          className="absolute inset-2 rounded-lg pointer-events-none"
+          style={{
+            boxShadow: `
+              inset 0 0 30px rgba(0,0,0,0.4),
+              0 0 0 8px #5c3d2e,
+              0 0 0 12px #3d2817,
+              0 8px 32px rgba(0,0,0,0.5)
+            `,
+          }}
+        />
+
+        {/* Header */}
+        <div className="relative z-20 p-6 flex justify-between items-center">
           <button
             onClick={() => setCurrentScreen("checkIn")}
-            className="text-[#2f5b19] hover:text-[#0f3012] flex items-center gap-2 font-semibold"
+            className="bg-white/90 backdrop-blur-sm text-[#5c3d2e] hover:bg-white flex items-center gap-2 font-bold px-4 py-2 rounded-full shadow-lg transition-all"
           >
             <ArrowLeft size={20} /> Back
           </button>
-          <button
-            onClick={() => setShowNewIdeaModal(true)}
-            className="duo-pill duo-cta px-4 py-2 flex items-center gap-2 text-base"
-          >
-            <Plus size={20} /> New Idea
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3 mb-6">
-          <h2 className="text-[#0f3012] text-2xl font-extrabold">
-            Your Idea Bank
-          </h2>
-          <span className="duo-chip text-xs">
-            💡 {ideas.length} ideas saved
-          </span>
-        </div>
-
-        {ideas.length === 0 ? (
-          <div className="text-center text-[#6e7f5b] py-12">
-            <p>No ideas yet. Click "New Idea" to add one!</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
+              <span className="font-bold text-[#5c3d2e]">💡 {ideas.length} ideas pinned</span>
+            </div>
+            <button
+              onClick={() => setShowNewIdeaModal(true)}
+              className="bg-[#58cc02] hover:bg-[#4caf00] text-white px-5 py-2 rounded-full flex items-center gap-2 font-bold shadow-lg transition-all hover:scale-105"
+            >
+              <Plus size={20} /> New Idea
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-6">
-            {ideas.map((idea) => {
-              const cover = idea.image || (idea.images && idea.images[0]);
+        </div>
+
+        {/* Title */}
+        <div className="relative z-10 text-center mb-4">
+          <h2 
+            className="inline-block text-3xl font-black text-white px-6 py-2 rounded-lg"
+            style={{
+              textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+              background: 'linear-gradient(135deg, #654321 0%, #8B4513 100%)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            🗂️ Your Idea Bank
+          </h2>
+        </div>
+
+        {/* Bulletin Board Area */}
+        <div 
+          ref={boardRef}
+          className="bulletin-board relative min-h-[calc(100vh-200px)] mx-6 mb-6"
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
+        >
+          {ideas.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 text-center shadow-xl">
+                <p className="text-[#5c3d2e] font-semibold text-lg">No ideas yet!</p>
+                <p className="text-[#8B4513] mt-2">Click "New Idea" to pin your first note.</p>
+              </div>
+            </div>
+          ) : (
+            ideas.map((idea, index) => {
+              const cover = idea.image || idea.images?.[0];
+              const colorIndex = idea.id % stickyColors.length;
+              const color = stickyColors[colorIndex];
+              const position = notePositions[idea.id] || getInitialPosition(index, idea.id);
+              const rotation = ((idea.id * 7) % 11) - 5; // Random rotation -5 to 5 degrees
+              const isBeingDragged = draggingNote === idea.id;
+              
               return (
                 <div
                   key={idea.id}
-                  className="duo-panel overflow-hidden shadow-md hover:shadow-xl transition-all relative group"
+                  className={`sticky-note absolute cursor-grab select-none transition-shadow ${isBeingDragged ? 'cursor-grabbing z-50' : 'z-10 hover:z-40'}`}
+                  style={{
+                    left: position.x,
+                    top: position.y,
+                    transform: `rotate(${rotation}deg) ${isBeingDragged ? 'scale(1.05)' : 'scale(1)'}`,
+                    width: '240px',
+                    transition: isBeingDragged ? 'none' : 'transform 0.2s ease, box-shadow 0.2s ease',
+                  }}
+                  onMouseDown={(e) => handleDragStart(e, idea.id)}
                 >
-                  {/* Edit button */}
-                  <button
-                    onClick={() => openEditIdea(idea)}
-                    className="absolute top-4 right-10 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#e6fbce] z-10 border border-[#d9f1ba]"
+                  {/* Push pin */}
+                  <div 
+                    className="absolute left-1/2 -translate-x-1/2 -top-3 z-20"
+                    style={{ pointerEvents: 'none' }}
                   >
-                    <Edit2 size={16} className="text-[#2f5b19]" />
-                  </button>
+                    {/* Pin head */}
+                    <div 
+                      className="w-6 h-6 rounded-full relative"
+                      style={{
+                        background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 50%, #7f1d1d 100%)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.3)',
+                      }}
+                    >
+                      {/* Pin highlight */}
+                      <div 
+                        className="absolute top-1 left-1 w-2 h-2 rounded-full bg-white/40"
+                      />
+                    </div>
+                    {/* Pin needle shadow */}
+                    <div 
+                      className="absolute top-5 left-1/2 -translate-x-1/2 w-1 h-3 rounded-b"
+                      style={{
+                        background: 'linear-gradient(to bottom, #374151 0%, #1f2937 100%)',
+                      }}
+                    />
+                  </div>
 
-                  {/* Delete button */}
-                  <button
-                    onClick={() => deleteIdea(idea.id)}
-                    className="absolute top-4 right-2 p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10 border border-[#d9f1ba]"
+                  {/* Sticky note body */}
+                  <div
+                    className="rounded-sm p-4 pt-5 relative group"
+                    style={{
+                      backgroundColor: color.bg,
+                      boxShadow: isBeingDragged 
+                        ? `8px 8px 20px rgba(0,0,0,0.4), 0 0 0 1px ${color.shadow}`
+                        : `4px 4px 12px rgba(0,0,0,0.25), 0 0 0 1px ${color.shadow}`,
+                      minHeight: '180px',
+                    }}
                   >
-                    <X size={16} className="text-red-500" />
-                  </button>
+                    {/* Folded corner effect */}
+                    <div 
+                      className="absolute bottom-0 right-0 w-8 h-8"
+                      style={{
+                        background: `linear-gradient(135deg, transparent 50%, ${color.shadow} 50%)`,
+                        opacity: 0.5,
+                      }}
+                    />
 
-                  <div className="p-4">
+                    {/* Delete button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteIdea(idea.id);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10 z-10"
+                    >
+                      <X size={14} style={{ color: color.text }} />
+                    </button>
+
                     {/* Cover Image */}
                     {cover && (
-                      <ImageWithFallback
-                        src={cover}
-                        alt={idea.title}
-                        onClick={() => setFullscreenImage(cover)}
-                        className="w-full h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-all mb-3"
-                      />
+                      <div 
+                        className="mb-3 -mx-1 cursor-pointer"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          openEditIdea(idea);
+                        }}
+                      >
+                        <ImageWithFallback
+                          src={cover}
+                          alt={idea.title}
+                          className="w-full h-24 object-cover rounded shadow-sm"
+                          style={{ 
+                            border: `2px solid ${color.shadow}`,
+                          }}
+                        />
+                      </div>
                     )}
 
-                    <h3 className="text-[#0f3012] mb-2 font-bold">
+                    {/* Title */}
+                    <h3 
+                      className="font-bold text-sm mb-2 leading-tight cursor-pointer hover:underline"
+                      style={{ 
+                        color: color.text,
+                        fontFamily: "'Caveat', 'Comic Sans MS', cursive",
+                        fontSize: '1.1rem',
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        openEditIdea(idea);
+                      }}
+                    >
                       {idea.title}
                     </h3>
 
+                    {/* Notes */}
                     {idea.notes && (
-                      <p className="text-[#2f5b19] text-sm mb-3 line-clamp-2">
+                      <p 
+                        className="text-xs mb-2 line-clamp-3 cursor-pointer"
+                        style={{ 
+                          color: color.text,
+                          opacity: 0.85,
+                          fontFamily: "'Caveat', 'Comic Sans MS', cursive",
+                          fontSize: '0.95rem',
+                          lineHeight: '1.3',
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          openEditIdea(idea);
+                        }}
+                      >
                         {idea.notes}
                       </p>
                     )}
 
                     {/* Tags */}
                     {idea.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {idea.tags.slice(0, 3).map((tag) => (
-                          <span key={tag} className="duo-chip text-xs">
+                      <div 
+                        className="flex flex-wrap gap-1 mt-2 cursor-pointer"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          openEditIdea(idea);
+                        }}
+                      >
+                        {idea.tags.slice(0, 2).map((tag) => (
+                          <span 
+                            key={tag} 
+                            className="text-xs px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: `${color.text}15`,
+                              color: color.text,
+                              fontFamily: "'Caveat', 'Comic Sans MS', cursive",
+                            }}
+                          >
                             #{tag}
                           </span>
                         ))}
-                        {idea.tags.length > 3 && (
-                          <span className="text-[#6e7f5b] text-xs">
-                            +{idea.tags.length - 3} more
+                        {idea.tags.length > 2 && (
+                          <span 
+                            className="text-xs"
+                            style={{ color: color.text, opacity: 0.7 }}
+                          >
+                            +{idea.tags.length - 2}
                           </span>
                         )}
                       </div>
                     )}
 
-                    <p className="text-[#3c6d23] font-semibold text-sm">
+                    {/* Date */}
+                    <p 
+                      className="text-xs mt-2 opacity-60"
+                      style={{ 
+                        color: color.text,
+                        fontFamily: "'Caveat', 'Comic Sans MS', cursive",
+                      }}
+                    >
                       {idea.date}
                     </p>
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
+            })
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Screen 5: Past Work
   const PastWorkScreen = () => (
